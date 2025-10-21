@@ -119,7 +119,8 @@ def extract_all_urls(update: Update) -> List[str]:
     urls = extract_urls_from_entities(msg.entities, text)
     urls += extract_urls_from_entities(msg.caption_entities, text)
     urls += URL_RE.findall(text)  # fallback по regex
-    cleaned, seen: List[str] = [], set()
+    cleaned = []
+    seen = set()
     for u in urls:
         u = u.strip().strip(".,)>(").lower()
         if u and u not in seen:
