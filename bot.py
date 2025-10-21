@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import logging
 import os
+import logging
 import re
 from typing import List, Tuple, Set
 from urllib.parse import urlparse
@@ -10,20 +10,16 @@ from urllib.parse import urlparse
 import yaml
 from telegram import Update, MessageEntity
 from telegram.constants import ChatType
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+
 print(">>> TOP of bot.py reached")  # видно, что файл вообще запускается
 
-TOKEN = os.getenv("8413084619:AAGhsQs5qqcD-cJY9hHMp5CRwEzxLOYdkCM")
+# Берём токен из переменной окружения Railway
+TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    raise SystemExit("8413084619:AAGhsQs5qqcD-cJY9hHMp5CRwEzxLOYdkCM")
-    
-# ============================
+    raise SystemExit("Please set BOT_TOKEN environment variable")
+
+# Логирование
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
