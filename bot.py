@@ -185,6 +185,28 @@ async def myid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Не удалось определить ID.")
 
+async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Uptime и счётчик удалений берём из глобальных
+    up = _fmt_uptime(time.time() - START_TS)
+    await update.message.reply_text(
+        f"📊 Статистика\n"
+        f"⏱️ Uptime: {up}\n"
+        f"🗑️ Удалено сообщений: {DELETE_COUNTER}"
+    )
+async def on_startup(app: Application):
+    admin_ids = CONFIG.get("admin_ids", [])
+    if not admin_ids:
+        return
+    try:
+        up = _fmt_uptime(time.time() - START_TS)
+        await app.bot.send_message(
+            chat_id=admin_ids[0],
+            text=f"✅ Бот запущен (перезапущен).\n⏱️ Uptime (на момент старта): {up}\n"
+                 f"🗑️ Удалено ранее (с момента старта процесса): {DELETE_COUNTER}"
+        )
+    except Exception as e:
+        logger.warning("Startup notify failed: %s", e)
+
 async def getadmins_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     if chat.type not in ("group", "supergroup"):
@@ -264,7 +286,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------- ЗАПУСК ----------
 
 def main():
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).post_init(on_startup).build()
 
     # 2) регистрируем хендлеры
     app.add_handler(CommandHandler("start", start_cmd))
@@ -272,6 +294,7 @@ def main():
     app.add_handler(CommandHandler("myid",  myid_cmd))
     app.add_handler(CommandHandler("getadmins", getadmins_cmd))
     app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL, handle_message))
+    app.add_handler(CommandHandler("stats", stats_cmd))
 
     # 3) стартуем polling (после этого функция не вернётся, пока бот работает)
     logging.getLogger("antispam-bot").info("Bot started. Waiting for updates...")
