@@ -193,16 +193,21 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⏱️ Uptime: {up}\n"
         f"🗑️ Удалено сообщений: {DELETE_COUNTER}"
     )
+
 async def on_startup(app: Application):
     admin_ids = CONFIG.get("admin_ids", [])
     if not admin_ids:
         return
+
     try:
         up = _fmt_uptime(time.time() - START_TS)
         await app.bot.send_message(
             chat_id=admin_ids[0],
-            text=f"✅ Бот запущен (перезапущен).\n⏱️ Uptime (на момент старта): {up}\n"
-                 f"🗑️ Удалено ранее (с момента старта процесса): {DELETE_COUNTER}"
+            text=(
+                f"✅ Бот запущен (перезапущен).\n"
+                f"⏱️ Uptime (на момент старта): {up}\n"
+                f"🗑️ Удалено ранее (с момента старта процесса): {DELETE_COUNTER}"
+            )
         )
     except Exception as e:
         logger.warning("Startup notify failed: %s", e)
