@@ -19,7 +19,7 @@ from telegram.ext import (
 )
 print(">>> TOP of bot.py reached")  # видно, что файл вообще запускается
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("8413084619:AAGhsQs5qqcD-cJY9hHMp5CRwEzxLOYdkCM")
 if not TOKEN:
     raise SystemExit("Please set BOT_TOKEN environment variable")
 
