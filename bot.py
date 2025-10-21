@@ -12,6 +12,15 @@ from telegram import Update, MessageEntity
 from telegram.constants import ChatType
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+import time
+from datetime import timedelta
+
+START_TS = time.time()
+DELETE_COUNTER = 0
+
+def _fmt_uptime(seconds: float) -> str:
+    return str(timedelta(seconds=int(seconds)))
+
 print(">>> TOP of bot.py reached")  # видно, что файл вообще запускается
 
 # Берём токен из переменной окружения Railway
@@ -227,12 +236,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         should_delete = True; reasons.append("blocked keywords")
 
     if should_delete:
+    try:
+        # считаем удалённые сообщения
+        global DELETE_COUNTER
+        DELETE_COUNTER += 1
+
+        await msg.delete()
+        logger.info("Deleted in %s by %s. Reasons: %s", chat.id, user.id, ", ".join(reasons))
+    except Exception as e:
+        logger.error("Failed to delete message: %s", e)
         try:
-            await msg.delete()
+            await context.bot.send_message(
+                chat_id=chat.id,
+                text="⚠️ Не удалось удалить подозрительное сообщение. Убедитесь, что у меня есть права администратора."
+            )
+        except Exception:
+            pass
+
             logger.info("Deleted in %s by %s. Reasons: %s", chat.id, user.id, ", ".join(reasons))
-        except Exception as e:
-            logger.error("Failed to delete message: %s", e)
-            try:
                 await context.bot.send_message(
                     chat_id=chat.id,
                     text="⚠️ Не удалось удалить подозрительное сообщение. Дайте боту право Delete Messages."
