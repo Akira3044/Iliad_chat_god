@@ -4,6 +4,8 @@
 import os
 import logging
 import re
+import time
+from datetime import timedelta
 from typing import List, Tuple, Set
 from urllib.parse import urlparse
 
@@ -12,34 +14,33 @@ from telegram import Update, MessageEntity
 from telegram.constants import ChatType
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
-import time
-from datetime import timedelta
+# --- маркер, что файл стартовал ---
+print(">>> TOP of bot.py reached")
 
-START_TS = time.time()
-DELETE_COUNTER = 0
-
-def _fmt_uptime(seconds: float) -> str:
-    return str(timedelta(seconds=int(seconds)))
-
-print(">>> TOP of bot.py reached")  # видно, что файл вообще запускается
-
-# Берём токен из переменной окружения Railway
+# === токен из переменной окружения (Railway Variables) ===
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise SystemExit("Please set BOT_TOKEN environment variable")
 
-# Логирование
+# === логирование ===
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger("antispam-bot")
 
-# Значения по умолчанию (если нет config.yml)
+# === аптайм/счётчики ===
+START_TS = time.time()
+DELETE_COUNTER = 0
+
+def _fmt_uptime(seconds: float) -> str:
+    return str(timedelta(seconds=int(seconds)))
+
+# === конфиг по умолчанию (если нет config.yml) ===
 DEFAULT_CONFIG = {
     "admin_ids": [],
-    "allowed_tme": ["t.me/your_channel", "t.me/your_chat"],  # разрешённые t.me/***
-    "allowed_domains": ["your-site.com"],                    # разрешённые домены
+    "allowed_tme": ["t.me/your_channel", "t.me/your_chat"],
+    "allowed_domains": ["your-site.com"],
     "keywords_block": [
         # RU
         "заработок онлайн", "лёгкий заработок", "лёгкие деньги", "легкий заработок",
@@ -118,7 +119,7 @@ def extract_all_urls(update: Update) -> List[str]:
     urls = extract_urls_from_entities(msg.entities, text)
     urls += extract_urls_from_entities(msg.caption_entities, text)
     urls += URL_RE.findall(text)  # fallback по regex
-    cleaned, seen = [], set()
+    cleaned, seen: List[str] = [], set()
     for u in urls:
         u = u.strip().strip(".,)>(").lower()
         if u and u not in seen:
@@ -180,13 +181,9 @@ async def ping_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def myid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if user:
-        await update.message.reply_text(f"Ваш Telegram user_id: {user.id}")
-    else:
-        await update.message.reply_text("Не удалось определить ID.")
+    await update.message.reply_text(f"Ваш Telegram user_id: {user.id if user else '—'}")
 
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Uptime и счётчик удалений берём из глобальных
     up = _fmt_uptime(time.time() - START_TS)
     await update.message.reply_text(
         f"📊 Статистика\n"
@@ -194,11 +191,20 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🗑️ Удалено сообщений: {DELETE_COUNTER}"
     )
 
+async def getadmins_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if chat.type not in ("group", "supergroup"):
+        await update.message.reply_text("Эта команда работает только в группе/супергруппе.")
+        return
+    admins = await context.bot.get_chat_administrators(chat.id)
+    lines = [f"{adm.user.full_name} — {adm.user.id} ({adm.status})" for adm in admins]
+    await update.message.reply_text("Администраторы чата:\n" + "\n".join(lines))
+
+# авто-уведомление админу при старте
 async def on_startup(app: Application):
     admin_ids = CONFIG.get("admin_ids", [])
     if not admin_ids:
         return
-
     try:
         up = _fmt_uptime(time.time() - START_TS)
         await app.bot.send_message(
@@ -211,18 +217,6 @@ async def on_startup(app: Application):
         )
     except Exception as e:
         logger.warning("Startup notify failed: %s", e)
-
-async def getadmins_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    if chat.type not in ("group", "supergroup"):
-        await update.message.reply_text("Эта команда работает только в группе/супергруппе.")
-        return
-    admins = await context.bot.get_chat_administrators(chat.id)
-    lines = []
-    for adm in admins:
-        u = adm.user
-        lines.append(f"{u.full_name} — {u.id} ({adm.status})")
-    await update.message.reply_text("Администраторы чата:\n" + "\n".join(lines))
 
 # ---------- ОСНОВНОЙ ХЕНДЛЕР СООБЩЕНИЙ ----------
 
@@ -263,27 +257,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         should_delete = True; reasons.append("blocked keywords")
 
     if should_delete:
-    try:
-        # считаем удалённые сообщения
-        global DELETE_COUNTER
-        DELETE_COUNTER += 1
-
-        await msg.delete()
-        logger.info("Deleted in %s by %s. Reasons: %s", chat.id, user.id, ", ".join(reasons))
-    except Exception as e:
-        logger.error("Failed to delete message: %s", e)
         try:
-            await context.bot.send_message(
-                chat_id=chat.id,
-                text="⚠️ Не удалось удалить подозрительное сообщение. Убедитесь, что у меня есть права администратора."
-            )
-        except Exception:
-            pass
+            # считаем удалённые сообщения
+            global DELETE_COUNTER
+            DELETE_COUNTER += 1
 
+            await msg.delete()
             logger.info("Deleted in %s by %s. Reasons: %s", chat.id, user.id, ", ".join(reasons))
+        except Exception as e:
+            logger.error("Failed to delete message: %s", e)
+            try:
                 await context.bot.send_message(
                     chat_id=chat.id,
-                    text="⚠️ Не удалось удалить подозрительное сообщение. Дайте боту право Delete Messages."
+                    text="⚠️ Не удалось удалить подозрительное сообщение. Убедитесь, что у меня есть права администратора."
                 )
             except Exception:
                 pass
@@ -293,40 +279,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).post_init(on_startup).build()
 
-    # 2) регистрируем хендлеры
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CommandHandler("ping",  ping_cmd))
     app.add_handler(CommandHandler("myid",  myid_cmd))
     app.add_handler(CommandHandler("getadmins", getadmins_cmd))
-    app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL, handle_message))
     app.add_handler(CommandHandler("stats", stats_cmd))
+    app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL, handle_message))
 
-    # 3) стартуем polling (после этого функция не вернётся, пока бот работает)
-    logging.getLogger("antispam-bot").info("Bot started. Waiting for updates...")
+    logger.info("Bot started. Waiting for updates...")
     print("✅ Anti-spam bot is running. Send /ping to me in Telegram to test.")
     app.run_polling(close_loop=False)
 
 if __name__ == "__main__":
-    import traceback
-    try:
-        main()
-    except (KeyboardInterrupt, SystemExit):
-        pass
-    except Exception:
-        traceback.print_exc()
-
-
-
-
-if __name__ == "__main__":
-    import traceback
-    print(">>> __main__ block executing")  # маркер входа в нижний блок
-    try:
-        print(">>> calling main()")        # маркер перед вызовом main
-        main()
-    except (KeyboardInterrupt, SystemExit):
-        print(">>> graceful exit")
-        pass
-    except Exception:
-        print(">>> exception in main, traceback below:")
-        traceback.print_exc()
+    main()
