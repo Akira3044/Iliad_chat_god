@@ -293,10 +293,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if has_bad_kw:
         should_delete = True; reasons.append("blocked keywords")
 
-    if should_delete:
+        if should_delete:
+        global DELETE_COUNTER
         try:
             # считаем удалённые сообщения
-            global DELETE_COUNTER
             DELETE_COUNTER += 1
 
             await msg.delete()
