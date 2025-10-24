@@ -32,6 +32,7 @@ logger = logging.getLogger("antispam-bot")
 # === аптайм/счётчики ===
 START_TS = time.time()
 DELETE_COUNTER = 0
+ALBUM_PHOTO_LIMIT = 3  # максимум фото в одном альбоме
 
 def _fmt_uptime(seconds: float) -> str:
     return str(timedelta(seconds=int(seconds)))
@@ -242,6 +243,36 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2) whitelist: админы из config.yml
     if is_admin(user.id):
         return
+
+        # --- антиспам по альбомам (слишком много фото) ---
+    mgid = msg.media_group_id
+    if mgid:
+        key = f"album:{mgid}"
+        rec = context.chat_data.get(key)
+        if not rec:
+            rec = {"ids": [], "ts": time.time()}
+            context.chat_data[key] = rec
+
+        rec["ids"].append(msg.message_id)
+
+        # если превысили лимит, удаляем весь альбом (все собранные сообщения)
+        if len(rec["ids"]) > ALBUM_PHOTO_LIMIT:
+            global DELETE_COUNTER
+            deleted = 0
+            for mid in rec["ids"]:
+                try:
+                    await context.bot.delete_message(chat_id=chat.id, message_id=mid)
+                    DELETE_COUNTER += 1
+                    deleted += 1
+                except Exception:
+                    pass
+
+            logger.info(
+                "Deleted album %s in chat %s: %d photos (> %d)",
+                mgid, chat.id, len(rec["ids"]), ALBUM_PHOTO_LIMIT
+            )
+            context.chat_data.pop(key, None)
+            return  # всё удалили — дальше не проверяем
 
     text = text_of_message(update)
     urls = extract_all_urls(update)
