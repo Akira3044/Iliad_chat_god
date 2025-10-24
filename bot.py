@@ -228,6 +228,7 @@ async def on_startup(app: Application):
 # ---------- ОСНОВНОЙ ХЕНДЛЕР СООБЩЕНИЙ ----------
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global DELETE_COUNTER
     msg = update.effective_message
     user = msg.from_user
     chat = update.effective_chat
