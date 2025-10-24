@@ -292,8 +292,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         should_delete = True; reasons.append("phone contact")
     if has_bad_kw:
         should_delete = True; reasons.append("blocked keywords")
-
-        if should_delete:
+    if should_delete:
         global DELETE_COUNTER
         try:
             # считаем удалённые сообщения
