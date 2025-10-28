@@ -256,11 +256,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         rec["ids"].append(msg.message_id)
 
-        # если превысили лимит, удаляем весь альбом (все собранные сообщения)
-        if len(rec["ids"]) > ALBUM_PHOTO_LIMIT:
-            global DELETE_COUNTER
+                # если превысили лимит, подождём немного, чтобы получить остальные фото
+        if len(rec["ids"]) == ALBUM_PHOTO_LIMIT + 1:
+            await asyncio.sleep(1.0)  # ждём 1 секунду, чтобы Telegram успел прислать оставшиеся
+
+            # соберём все сообщения из этого альбома (вдруг пришли новые)
+            group_msgs = [m for m in context.chat_data[key]["ids"]]
+            logger.info(
+                "Album %s exceeded limit (%d). Deleting all %d photos.",
+                mgid, ALBUM_PHOTO_LIMIT, len(group_msgs)
+            )
+
             deleted = 0
-            for mid in rec["ids"]:
+            for mid in group_msgs:
                 try:
                     await context.bot.delete_message(chat_id=chat.id, message_id=mid)
                     DELETE_COUNTER += 1
@@ -268,12 +276,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception:
                     pass
 
-            logger.info(
-                "Deleted album %s in chat %s: %d photos (> %d)",
-                mgid, chat.id, len(rec["ids"]), ALBUM_PHOTO_LIMIT
-            )
+            logger.info("Deleted %d messages from album %s", deleted, mgid)
             context.chat_data.pop(key, None)
-            return  # всё удалили — дальше не проверяем
+            return
 
     text = text_of_message(update)
     urls = extract_all_urls(update)
