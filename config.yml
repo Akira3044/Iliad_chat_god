@@ -7,7 +7,6 @@ allowed_tme:         # t.me links allowed (your own channel/chat).
   - "https://t.me/grotesqueriebtc"
 allowed_domains:     # trusted non-Telegram domains allowed
   - "your-site.com"
-  - ""
   - "https://www.mexc.com/ru-RU/futures-activity/trading-competition?id=MzAwLXBlcnNvbmFsR2FtZQ%3D%3D&utm_source=kol&utm_medium=kol&inviteCode=1NUMA"
   - "https://www.mexc.com/campaigns/invite-sep2-user?inviteCode=1NUMA"
   - "https://www.okx.com/join/61133973"
