@@ -32,7 +32,7 @@ logger = logging.getLogger("antispam-bot")
 # === аптайм/счётчики ===
 START_TS = time.time()
 DELETE_COUNTER = 0
-ALBUM_PHOTO_LIMIT = 3  # максимум фото в одном альбоме
+ALBUM_PHOTO_LIMIT = 3
 
 def _fmt_uptime(seconds: float) -> str:
     return str(timedelta(seconds=int(seconds)))
@@ -245,7 +245,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_admin(user.id):
         return
 
-        # --- антиспам по альбомам (слишком много фото) ---
+    # --- антиспам по альбомам (слишком много фото) ---
     mgid = msg.media_group_id
     if mgid:
         key = f"album:{mgid}"
@@ -256,19 +256,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         rec["ids"].append(msg.message_id)
 
-                # если превысили лимит, подождём немного, чтобы получить остальные фото
-        if len(rec["ids"]) == ALBUM_PHOTO_LIMIT + 1:
-            await asyncio.sleep(1.0)  # ждём 1 секунду, чтобы Telegram успел прислать оставшиеся
-
-            # соберём все сообщения из этого альбома (вдруг пришли новые)
-            group_msgs = [m for m in context.chat_data[key]["ids"]]
-            logger.info(
-                "Album %s exceeded limit (%d). Deleting all %d photos.",
-                mgid, ALBUM_PHOTO_LIMIT, len(group_msgs)
-            )
-
+        # если превышен лимит, удаляем все фото из альбома
+        if len(rec["ids"]) > ALBUM_PHOTO_LIMIT:
+            global DELETE_COUNTER
             deleted = 0
-            for mid in group_msgs:
+            for mid in list(rec["ids"]):
                 try:
                     await context.bot.delete_message(chat_id=chat.id, message_id=mid)
                     DELETE_COUNTER += 1
@@ -276,7 +268,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception:
                     pass
 
-            logger.info("Deleted %d messages from album %s", deleted, mgid)
+            logger.info(
+                "Deleted full album %s in chat %s: %d photos (> %d)",
+                mgid, chat.id, len(rec["ids"]), ALBUM_PHOTO_LIMIT
+            )
+
+            # удаляем запись, чтобы не трогать её снова
             context.chat_data.pop(key, None)
             return
 
