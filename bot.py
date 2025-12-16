@@ -211,7 +211,8 @@ async def getadmins_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admins = await context.bot.get_chat_administrators(chat.id)
     lines = [f"{adm.user.full_name} — {adm.user.id} ({adm.status})" for adm in admins]
     await update.message.reply_text("Администраторы чата:\n" + "\n".join(lines))
-    async def blocklist_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    
+async def blocklist_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
 
