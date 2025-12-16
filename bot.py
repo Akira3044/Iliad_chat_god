@@ -93,6 +93,11 @@ def load_config() -> dict:
 
 CONFIG = load_config()
 
+def save_config():
+    path = os.getenv("CONFIG_PATH", "config.yml")
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(CONFIG, f, allow_unicode=True, sort_keys=False)
+
 # ---------- ВСПОМОГАТЕЛЬНЫЕ ----------
 
 def text_of_message(update: Update) -> str:
@@ -206,6 +211,35 @@ async def getadmins_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admins = await context.bot.get_chat_administrators(chat.id)
     lines = [f"{adm.user.full_name} — {adm.user.id} ({adm.status})" for adm in admins]
     await update.message.reply_text("Администраторы чата:\n" + "\n".join(lines))
+    async def blocklist_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+
+    # только админы
+    if not user or not is_admin(user.id):
+        await msg.reply_text("⛔ У тебя нет прав.")
+        return
+
+    # текст после команды
+    if not context.args:
+        await msg.reply_text("❗ Использование:\n/blocklist ТЕКСТ")
+        return
+
+    phrase = " ".join(context.args).strip().lower()
+
+    if not phrase:
+        await msg.reply_text("❗ Пустая фраза.")
+        return
+
+    # если уже есть
+    if phrase in CONFIG["keywords_block"]:
+        await msg.reply_text("ℹ️ Эта фраза уже есть в блоклисте.")
+        return
+
+    CONFIG["keywords_block"].append(phrase)
+    save_config()
+
+    await msg.reply_text(f"✅ Добавлено в блоклист:\n«{phrase}»")
 
 # авто-уведомление админу при старте
 async def on_startup(app: Application):
