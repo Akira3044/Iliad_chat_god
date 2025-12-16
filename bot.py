@@ -352,6 +352,7 @@ def main():
     app = Application.builder().token(TOKEN).post_init(on_startup).build()
 
     app.add_handler(CommandHandler("start", start_cmd))
+    app.add_handler(CommandHandler("blocklist", cmd_blocklist))
     app.add_handler(CommandHandler("ping",  ping_cmd))
     app.add_handler(CommandHandler("myid",  myid_cmd))
     app.add_handler(CommandHandler("getadmins", getadmins_cmd))
