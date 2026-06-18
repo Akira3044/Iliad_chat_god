@@ -14,6 +14,8 @@ from telegram import Update, MessageEntity
 from telegram.constants import ChatType
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+from mass_notify import configure_mass_notify, register_mass_notify_handlers, remember_user
+
 # --- маркер, что файл стартовал ---
 print(">>> TOP of bot.py reached")
 
@@ -40,6 +42,8 @@ def _fmt_uptime(seconds: float) -> str:
 # === конфиг по умолчанию (если нет config.yml) ===
 DEFAULT_CONFIG = {
     "admin_ids": [],
+    "skip_admins_in_tagall": False,
+    "tagall_batch_size": 7,
     "allowed_tme": ["t.me/your_channel", "t.me/your_chat"],
     "allowed_domains": ["your-site.com"],
     "keywords_block": [
@@ -268,6 +272,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = msg.from_user
     chat = update.effective_chat
 
+    # База для массовых оповещений; боты автоматически пропускаются.
+    if chat and user:
+        remember_user(chat.id, user)
+
     # 0) игнор сообщений "от имени канала"
     if msg.sender_chat is not None:
         return
@@ -352,17 +360,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).post_init(on_startup).build()
 
+    configure_mass_notify(CONFIG, is_admin, "known_users.json")
+
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CommandHandler("blocklist", cmd_blocklist))
     app.add_handler(CommandHandler("ping",  ping_cmd))
     app.add_handler(CommandHandler("myid",  myid_cmd))
     app.add_handler(CommandHandler("getadmins", getadmins_cmd))
     app.add_handler(CommandHandler("stats", stats_cmd))
+    register_mass_notify_handlers(app)
     app.add_handler(MessageHandler(filters.ALL & ~filters.StatusUpdate.ALL, handle_message))
 
     logger.info("Bot started. Waiting for updates...")
     print("✅ Anti-spam bot is running. Send /ping to me in Telegram to test.")
-    app.run_polling(close_loop=False)
+    app.run_polling(close_loop=False, allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()
