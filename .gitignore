@@ -201,6 +201,10 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Runtime mass-notification user directory
+known_users.json
+known_users.json.tmp
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
